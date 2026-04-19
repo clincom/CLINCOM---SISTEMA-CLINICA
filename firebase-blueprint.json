@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stored in /users/{uid}",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["patient", "doctor"] },
+        "crm": { "type": "string" },
+        "rqe": { "type": "string" },
+        "specialty": { "type": "string" },
+        "signature": { "type": "string" },
+        "vitals": {
+          "type": "object",
+          "properties": {
+            "heartRate": { "type": "number" },
+            "bloodPressure": { "type": "string" },
+            "oxygen": { "type": "number" },
+            "temperature": { "type": "number" }
+          }
+        },
+        "reminders": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["name", "role"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Doctor visits",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "patientName": { "type": "string" },
+        "doctorId": { "type": "string" },
+        "type": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["patientId", "doctorId", "date", "status"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Clinical files/exams",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "meta": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["userId", "title"]
+    },
+    "DoctorReminder": {
+      "title": "Doctor Reminder",
+      "description": "Internal tasks for doctors",
+      "type": "object",
+      "properties": {
+        "doctorId": { "type": "string" },
+        "title": { "type": "string" },
+        "desc": { "type": "string" },
+        "time": { "type": "string" }
+      },
+      "required": ["doctorId", "title"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles and patient health data"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Appointment records"
+    },
+    "/documents/{documentId}": {
+      "schema": "Document",
+      "description": "Clinical documents and results"
+    },
+    "/doctor_reminders/{reminderId}": {
+      "schema": "DoctorReminder",
+      "description": "Doctor's private reminders"
+    }
+  }
+}

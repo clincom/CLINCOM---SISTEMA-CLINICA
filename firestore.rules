@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // User Role Checks
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+    function isDoctor(uid) {
+      return isSignedIn() && getUserData(uid).role == 'doctor';
+    }
+
+    // --- Collections ---
+
+    // Users
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isDoctor(request.auth.uid);
+      allow list: if isDoctor(request.auth.uid); // Doctors can list patients
+      
+      allow create: if isOwner(userId) && 
+        incoming().keys().hasAll(['name', 'role']) &&
+        incoming().role in ['patient', 'doctor'] &&
+        incoming().name.size() > 0 && incoming().name.size() < 100;
+        
+      allow update: if isOwner(userId) && (
+        // Action: Update Vitals/Reminders (Patient)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['vitals', 'reminders', 'name'])) ||
+        // Action: Update Profile (General)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['crm', 'rqe', 'specialty', 'signature']))
+      ) || (isDoctor(request.auth.uid) && incoming().diff(existing()).affectedKeys().hasOnly(['vitals', 'reminders']));
+    }
+
+    // Appointments
+    match /appointments/{appointmentId} {
+      allow read: if isSignedIn() && (
+        isOwner(existing().patientId) || 
+        isOwner(existing().doctorId) ||
+        isDoctor(request.auth.uid)
+      );
+      
+      allow create: if isSignedIn() && 
+        (isOwner(incoming().patientId) || isDoctor(request.auth.uid)) &&
+        incoming().keys().hasAll(['patientId', 'doctorId', 'date', 'status']) &&
+        incoming().status == 'Pendente';
+        
+      allow update: if isSignedIn() && (
+        isOwner(existing().patientId) || 
+        isDoctor(request.auth.uid)
+      ) && incoming().diff(existing()).affectedKeys().hasAny(['status', 'date', 'time']);
+      
+      allow delete: if isDoctor(request.auth.uid);
+    }
+
+    // Documents
+    match /documents/{documentId} {
+      allow read: if isSignedIn() && (
+        isOwner(existing().userId) || 
+        isDoctor(request.auth.uid)
+      );
+      
+      allow write: if isDoctor(request.auth.uid);
+    }
+
+    // Doctor Reminders
+    match /doctor_reminders/{reminderId} {
+      allow read, write: if isDoctor(request.auth.uid) && isOwner(incoming().doctorId || existing().doctorId);
+    }
+  }
+}
